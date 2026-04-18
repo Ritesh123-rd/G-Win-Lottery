@@ -1,0 +1,47 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>G-Win | Secure Login</title>
+    <link rel="stylesheet" href="login.css">
+    <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@400;700;900&display=swap" rel="stylesheet">
+</head>
+<body>
+    <div class="login-container">
+        <!-- Ornaments -->
+        <img src="game/assets/ornament.png" class="ornament ornament-tl" alt="">
+        <img src="game/assets/ornament.png" class="ornament ornament-tr" alt="">
+        <img src="game/assets/ornament.png" class="ornament ornament-bl" alt="">
+        <img src="game/assets/ornament.png" class="ornament ornament-br" alt="">
+
+        <div class="logo-wrapper">
+            <img src="game/assets/g-win.png" alt="G-Win Logo">
+        </div>
+
+        <h2>Secure Entry</h2>
+
+        <form id="loginForm">
+            <div class="input-group">
+                <label for="username">Username</label>
+                <input type="text" id="username" placeholder="Enter your username" required autocomplete="username">
+            </div>
+            <div class="input-group">
+                <label for="password">Password</label>
+                <input type="password" id="password" placeholder="Enter your password" required autocomplete="current-password">
+            </div>
+
+            <button type="submit" class="login-btn" id="loginBtn">Access Terminal</button>
+            <div id="errorMsg" class="error-message"></div>
+        </form>
+
+        <div class="footer-text">
+            © 2026 G-WIN METRO LOTTERY SYSTEM. ALL RIGHTS RESERVED.
+        </div>
+    </div>
+
+    <script src="configApi.js"></script>
+    <script src="api.js"></script>
+    <script src="login.js"></script>
+</body>
+</html>

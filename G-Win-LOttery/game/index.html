@@ -1,0 +1,517 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0" />
+  <title>G WIN - Metro Lottery</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link
+    href="https://fonts.googleapis.com/css2?family=Nova+Oval&family=Outfit:wght@400;700;900&family=Playfair+Display:ital,wght@1,700&display=swap"
+    rel="stylesheet" />
+  <link rel="stylesheet" href="style.css" />
+  <script src="../configApi.js"></script>
+  <script src="../api.js"></script>
+</head>
+
+<body>
+
+  <div class="app-wrapper">
+
+    <!-- ══ HEADER ══════════════════════════════════════════════ -->
+    <header class="app-header">
+      <div class="header-center-group">
+        <div class="header-left-cluster">
+          <div class="header-icon-btn"><img src="assets/Key.png" alt="Admin" /></div>
+          <div class="header-icon-btn"><img src="assets/Setting.png" alt="Settings" /></div>
+        </div>
+
+        <div class="header-logo">
+          <img src="assets/g-win.png" alt="G WIN" />
+        </div>
+
+        <div class="header-right-cluster">
+          <div class="header-icon-btn report-icon"><img src="assets/pagefold.png" alt="Report" /></div>
+          <div class="power-reload-group">
+          <div class="header-icon-btn power-icon" id="logoutBtn"><img src="assets/StartButton.png" alt="Power" /></div>
+          </div>
+        </div>
+      </div>
+
+      <div class="header-info-badge">Akda Min : 5 Max : 10000</div>
+    </header>
+
+    <!-- ══ MAIN ════════════════════════════════════════════════ -->
+    <main class="main-layout">
+
+      <!-- LEFT GRID PANEL -->
+      <div class="panel grid-panel" id="left-grid"></div>
+
+      <!-- CENTER PANEL -->
+      <section class="center-panel">
+
+        <div class="tran-boxes">
+          <div class="tran-box"><span>Last Tran. No.</span> <span id="last-tran-id">0</span></div>
+          <div class="tran-box"><span>Last Tran. Pts.</span> <span id="last-tran-pts">0</span></div>
+        </div>
+
+        <div class="metro-title-row">
+          <span class="ornament ornament-l">
+            <img src="assets/Design2.png" alt="" />
+          </span>
+          <h1 class="metro-title">
+            <img src="assets/Metro.png" alt="Metro" />
+          </h1>
+          <span class="ornament ornament-r">
+            <img src="assets/Design.png" alt="" />
+          </span>
+        </div>
+
+        <div class="tran-id">Tran Id: 0</div>
+
+        <div class="info-bar">
+          <div class="info-group">
+            <label class="info-label">Server Time</label>
+            <div class="info-value" id="server-time">01-04-2026 2:38:58 PM</div>
+          </div>
+          <div class="info-group">
+            <label class="info-label">Player ID</label>
+            <div class="info-value player-id">19200026</div>
+          </div>
+        </div>
+
+        <div class="big-display">
+          <div class="digit-box">
+            <div class="digit-strip" id="reel-1"><span>8</span></div>
+          </div>
+          <div class="digit-box">
+            <div class="digit-strip" id="reel-2"><span>9</span></div>
+          </div>
+          <div class="digit-box">
+            <div class="digit-strip" id="reel-3"><span>0</span></div>
+          </div>
+        </div>
+
+        
+        <div class="status-row">
+          <div class="timer-box" id="prev-draw-time">08:50</div>
+          <div class="result-small" id="result-small-digit">7</div>
+        </div>
+
+        <div class="history-grid">
+          <div class="history-item">05:35<br />557<br />7</div>
+          <div class="history-item">05:30<br />399<br />1</div>
+          <div class="history-item">05:25<br />680<br />4</div>
+          <div class="history-item">05:20<br />690<br />5</div>
+          <div class="history-item">05:15<br />237<br />2</div>
+          <div class="history-item">05:10<br />888<br />4</div>
+        </div>
+
+        <div class="chips-row">
+          <div class="chip" style="--chip-bg:#2196F3"><span>1</span></div>
+          <div class="chip" style="--chip-bg:#906a46"><span>2</span></div>
+          <div class="chip" style="--chip-bg:#E91E63"><span>5</span></div>
+          <div class="chip" style="--chip-bg:#f0ec13"><span>10</span></div>
+          <div class="chip" style="--chip-bg:#22227a"><span>25</span></div>
+          <div class="chip" style="--chip-bg:#460995"><span>50</span></div>
+          <div class="chip" style="--chip-bg:#4CAF50"><span>100</span></div>
+          <div class="chip" style="--chip-bg:#0d4284"><span>500</span></div>
+          <div class="chip" style="--chip-bg:#38d1bc"><span>1k</span></div>
+          <div class="chip" style="--chip-bg:#ec4f4a"><span>5k</span></div>
+        </div>
+
+        <!-- Mobile-only grid toggle buttons (hidden on desktop via CSS) -->
+        <div class="mobile-grid-row" style="display:none">
+          <button class="mobile-grid-btn" id="toggle-left-grid">▼ Left Grid (100–229)</button>
+          <button class="mobile-grid-btn" id="toggle-right-grid">▼ Right Grid (400–529)</button>
+        </div>
+
+        <input type="text" class="barcode-input" placeholder="Press F12 For Scanning Barcode.." />
+
+      </section>
+
+      <!-- RIGHT GRID PANEL -->
+      <div class="panel grid-panel" id="right-grid"></div>
+
+      <!-- VERTICAL POINTER BAR -->
+      <div class="pointer-bar" id="right-pointers"></div>
+
+      <!-- RIGHT SIDEBAR -->
+      <aside class="panel right-sidebar">
+        <div class="akdax-wrap">
+          <div class="sidebar-btn akdax">AKdaX9</div>
+        </div>
+
+        <div class="sidebar-divider divider-sp"></div>
+
+        <div class="sidebar-items sp-items">
+          <div class="sidebar-btn title1">SP</div>
+          <div class="sidebar-ornament"><img src="assets/ornament.png" alt="" /></div>
+          <div class="sidebar-btn">SPX150</div>
+          <div class="sidebar-label">Min : 5</div>
+          <div class="sidebar-label">Max : 5000</div>
+        </div>
+
+        <div class="sidebar-divider divider-dp"></div>
+
+        <div class="sidebar-items dp-items">
+          <div class="sidebar-btn title">DP</div>
+          <div class="sidebar-ornament"><img src="assets/ornament.png" alt="" /></div>
+          <div class="sidebar-btn">DPX300</div>
+          <div class="sidebar-label">Min : 5</div>
+          <div class="sidebar-label">Max : 2500</div>
+        </div>
+
+        <div class="sidebar-divider divider-triple"></div>
+
+        <div class="sidebar-items triple-items">
+          <div class="sidebar-btn title2">TripleX10</div>
+        </div>
+      </aside>
+
+    </main>
+
+    <!-- ══ FOOTER ══════════════════════════════════════════════ -->
+    <footer class="app-footer">
+      <div class="points-bar">
+        <div class="points-section">
+          <span>Points :</span><span id="user-points">0</span>
+        </div>
+        <div class="points-section"> 
+          <span>Bet Points:</span><span>0</span>
+        </div>
+      </div>
+      <div class="action-buttons">
+        <button class="action-btn buy" title="Buy"></button>
+        <button class="action-btn reprint" title="Reprint"></button>
+        <button class="action-btn cancel" title="Cancel"></button>
+        <button class="action-btn clear" title="Clear"></button>
+        <button class="action-btn advance" title="Advance"></button>
+        <button class="action-btn result" title="Result"></button>
+      </div>
+    </footer>
+
+  </div><!-- /.app-wrapper -->
+
+
+
+  <!-- Reprint Modal Overlay -->
+<div id="reprint-modal" class="modal-overlay" style="display: none;">
+  <div class="modal-card modal-lg">
+    <div class="modal-header">
+      <div class="modal-title">
+      
+        <span>REPRINT TICKET</span>
+      </div>
+      <button class="modal-close" id="close-reprint">&times;</button>
+    </div>
+    
+    <div class="date-selector" style="background: rgba(40, 0, 0, 0.9); padding: 15px; border-bottom: 1px solid rgba(255, 215, 0, 0.3); display: flex; gap: 10px; align-items: center; justify-content: center; flex-wrap: wrap; flex-shrink: 0;">
+       <label style="color: gold; font-weight: bold;">Select Date:</label>
+       <input type="date" id="reprint-date-input" style="padding: 8px; border-radius: 4px; border: 1px solid gold; background: #222; color: #fff; font-family: inherit;">
+       <button id="fetch-reprint-btn" class="footer-action-btn" style="padding: 8px 20px; height: auto; font-size: 13px;">FETCH</button>
+    </div>
+    <div class="modal-body" style="background: rgba(0,0,0,0.8); flex: 1; overflow-y: auto;">
+      <div class="reprint-list">
+        <!-- Mock Ticket Items -->
+        <div style="color: #999; text-align: center; padding: 20px;">Please select a date and click FETCH.</div>
+      </div>
+    </div>
+    
+    <div class="modal-footer">
+      <button class="footer-action-btn" id="close-footer">CLOSE</button>
+    </div>
+  </div>
+</div>
+
+<!-- Cancel Modal Overlay -->
+<div id="cancel-modal" class="modal-overlay" style="display: none;">
+  <div class="modal-card modal-lg">
+    <div class="modal-header">
+      <div class="modal-title">
+      
+        <span>CANCEL TICKET</span>
+      </div>
+      <button class="modal-close" id="close-cancel">&times;</button>
+    </div>
+    
+    <div class="modal-body">
+      <div class="cancel-list">
+        <!-- Mock Ticket Items -->
+        <div class="cancel-item">
+          <div class="can-info">
+            <span class="can-id">ID: 882910</span>
+            <span class="can-time">02:30:15 PM</span>
+          </div>
+          <div class="can-pts">500 Pts</div>
+          <button class="can-btn">Cancel</button>
+        </div>
+        
+        <div class="cancel-item">
+          <div class="can-info">
+            <span class="can-id">ID: 882909</span>
+            <span class="can-time">02:25:10 PM</span>
+          </div>
+          <div class="can-pts">120 Pts</div>
+          <button class="can-btn">Cancel</button>
+        </div>
+
+        <div class="cancel-item">
+          <div class="can-info">
+            <span class="can-id">ID: 882908</span>
+            <span class="can-time">02:18:45 PM</span>
+          </div>
+          <div class="can-pts">2,500 Pts</div>
+          <button class="can-btn">Cancel</button>
+        </div>
+      </div>
+    </div>
+    
+    <div class="modal-footer">
+      <button class="footer-action-btn" id="close-cancel-footer">CLOSE</button>
+    </div>
+  </div>
+</div>
+
+
+<!--- Advance Draw --->
+<div id="advance-modal" class="modal-overlay" style="display: none;">
+  <div class="modal-card modal-lg">
+    <div class="modal-header"> 
+      <div class="modal-title">
+      
+        <span>Advance Draw</span>
+      </div>
+      <button class="modal-close" id="close-advance">&times;</button>
+    </div>
+    
+    <div class="modal-body">
+      <div class="advance-controls" style="position: sticky; top: -15px; margin: -15px -15px 15px -15px; padding: 15px; background: rgba(0,0,0,0.85); z-index: 10; border-bottom: 1px solid rgba(255, 215, 0, 0.3); display: flex; gap: 10px; align-items: center; justify-content: center; flex-wrap: wrap;">
+        <button id="advance-select-all" class="footer-action-btn" style="height: 35px; padding: 0 10px; font-size: 11px; width: auto;">SELECT ALL</button>
+        <button id="advance-clear" class="footer-action-btn" style="height: 35px; padding: 0 10px; font-size: 11px; width: auto; background: linear-gradient(to bottom, #777, #333);">CLEAR</button>
+        <div style="display: flex; align-items: center; gap: 8px;">
+          <span style="color: gold; font-size: 11px; font-weight: bold;">SELECT NEXT X DRAWS:</span>
+          <input type="number" id="advance-count-input" min="1" placeholder="Qty" style="width: 70px; height: 35px; background: #000; border: 1px solid gold; color: #fff; border-radius: 4px; padding: 0 5px; text-align: center; font-weight: bold;">
+        </div>
+      </div>
+      <div id="advance-slots-container" class="advance-slots-grid">
+      </div>
+    </div>
+    
+    <div class="modal-footer">
+      <button class="footer-action-btn submit-btn" id="submit-advance">SUBMIT</button>
+      <button class="footer-action-btn" id="close-advance-footer">CLOSE</button>
+    </div>
+  </div>
+</div>
+
+<!--- Result Draw --->
+<div id="result-modal" class="modal-overlay" style="display: none;">
+  <div class="modal-card modal-lg">
+    <div class="modal-header"> 
+      <div class="modal-title">
+      
+        <span>Result History</span>
+      </div>
+      <button class="modal-close" id="close-result">&times;</button>
+    </div>
+    
+    <div class="date-selector" style="background: rgba(40, 0, 0, 0.9); padding: 15px; border-bottom: 1px solid rgba(255, 215, 0, 0.3); display: flex; gap: 10px; align-items: center; justify-content: center; flex-wrap: wrap; flex-shrink: 0;">
+       <label style="color: gold; font-weight: bold;">Select Date:</label>
+       <input type="date" id="result-date-input" style="padding: 8px; border-radius: 4px; border: 1px solid gold; background: #222; color: #fff; font-family: inherit;">
+       <button id="fetch-result-btn" class="footer-action-btn" style="padding: 8px 20px; height: auto; font-size: 13px;">FETCH</button>
+    </div>
+    <div class="modal-body" style="background: rgba(0,0,0,0.8); flex: 1; overflow-y: auto;">
+      <div id="result-list-container" class="result-list-grid">
+         <div style="color: #999; text-align: center; padding: 20px;">Please select a date and click FETCH.</div>
+      </div>
+    </div>
+
+
+    
+    <div class="modal-footer">
+      <button class="footer-action-btn" id="close-result-footer">CLOSE</button>
+    </div>
+  </div>
+</div>
+
+<!-- Logout Confirmation Modal -->
+<div id="logout-modal" class="modal-overlay" style="display: none;">
+  <div class="modal-card logout-card">
+    <div class="modal-header">
+      <div class="modal-title">
+        <span>LOGOUT</span>
+      </div>
+      <button class="modal-close" id="close-logout-modal">&times;</button>
+    </div>
+    <div class="modal-body logout-body">
+      <p>Are you sure you want to logout from the terminal?</p>
+    </div>
+    <div class="modal-footer logout-footer">
+      <button class="confirm-btn" id="confirm-logout">YES, LOGOUT</button>
+      <button class="cancel-btn" id="cancel-logout">CANCEL</button>
+    </div>
+  </div>
+</div>
+
+<!-- Claim Status Modal -->
+<div id="claim-modal" class="modal-overlay" style="display: none;">
+  <div class="modal-card">
+    <div class="modal-header">
+      <div class="modal-title">
+        <span id="claim-status-title">CLAIM STATUS</span>
+      </div>
+      <button class="modal-close" id="close-claim-modal">&times;</button>
+    </div>
+    <div class="modal-body" style="text-align: center; padding: 30px 20px;">
+      <div id="claim-status-icon" style="font-size: 50px; margin-bottom: 15px;"></div>
+      <p id="claim-status-message" style="color: #fff; font-size: 16px; font-weight: bold;"></p>
+    </div>
+    <div class="modal-footer">
+      <button class="footer-action-btn" id="claim-modal-ok">OK</button>
+    </div>
+  </div>
+</div>
+
+<!-- Result Reveal Modal (Simplified) -->
+<div id="winning-modal" class="modal-overlay" style="display: none; background: rgba(0,0,0,0.9);">
+  <div class="modal-card winning-card" style="border:none; background:transparent; box-shadow:none; overflow: visible;">
+    <div class="modal-body winning-body" style="padding:0; overflow: visible;">
+      <div class="big-display popup-display">
+        <div class="digit-box">
+          <div class="digit-strip" id="popup-reel-1"><span>0</span></div>
+        </div>
+        <div class="digit-box">
+          <div class="digit-strip" id="popup-reel-2"><span>0</span></div>
+        </div>
+        <div class="digit-box">
+          <div class="digit-strip" id="popup-reel-3"><span>0</span></div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script src="script.js"></script>
+
+  <script>
+    /* Show mobile grid toggle buttons only on small screens */
+    function checkMobileGridRow() {
+      const row = document.querySelector('.mobile-grid-row');
+      if (!row) return;
+      row.style.display = window.innerWidth <= 767 ? 'flex' : 'none';
+    }
+    window.addEventListener('resize', checkMobileGridRow);
+    document.addEventListener('DOMContentLoaded', checkbilw)  </script>
+  <script>
+    // --- Manual Claim Logic injected for rapid iteration ---
+    function initClaimInPage() {
+      const barcodeInput = document.querySelector('.barcode-input');
+      if (!barcodeInput) return;
+
+      const claimModal = document.getElementById('claim-modal');
+      const claimIcon = document.getElementById('claim-status-icon');
+      const claimMsg = document.getElementById('claim-status-message');
+      const closeClaim = document.getElementById('close-claim-modal');
+      const okClaim = document.getElementById('claim-modal-ok');
+
+            const showClaimStatus = (res) => {
+        if (!claimModal) return;
+        
+        const success = res && res.status === true;
+        const msg = res && res.message ? res.message : (success ? 'Claim Successful!' : 'Invalid Barcode.');
+        
+        // Custom styling for "Result not declared yet"
+        if (msg.toLowerCase().includes('not declared')) {
+            claimIcon.innerHTML = '⏳';
+            claimIcon.style.color = '#FFC107'; // Golden/Amber
+        } else {
+            claimIcon.innerHTML = success ? '✅' : '❌';
+            claimIcon.style.color = success ? '#4CAF50' : '#f44336';
+        }
+
+        let displayMsg = msg;
+
+        // ✔️ NEW LOGIC: Agar claim successful hai aur win amount available hai
+        if (success && res.amount) {
+            displayMsg += `<br/><br/><span style="font-size: 24px; color: #4CAF50; font-weight: 900; letter-spacing: 1px;">🎉 WIN AMOUNT: ${res.amount} PTS 🎉</span>`;
+        } else if (success && res.win_amount) { // API agar 'win_amount' format me bhej rahi ho 
+            displayMsg += `<br/><br/><span style="font-size: 24px; color: #4CAF50; font-weight: 900; letter-spacing: 1px;">🎉 WIN AMOUNT: ${res.win_amount} PTS 🎉</span>`;
+        }
+
+        // Add Next Draw time if present
+        if (res && res.nxt_draw) {
+            displayMsg += `<br/><span style="font-size: 13px; color: gold; display: block; margin-top: 10px;">Next Draw: ${res.nxt_draw}</span>`;
+        }
+        
+        claimMsg.innerHTML = displayMsg;
+        claimModal.style.display = 'flex';
+      };
+
+
+      const hideClaimModal = () => { 
+        if(claimModal) claimModal.style.display = 'none'; 
+        location.reload(); // Refresh page after closing claim status
+      };
+      if(closeClaim) closeClaim.addEventListener('click', hideClaimModal);
+      if(okClaim) okClaim.addEventListener('click', hideClaimModal);
+
+      let isClaiming = false;
+      let lastProcessedBarcode = '';
+
+      barcodeInput.addEventListener('input', async (e) => {
+        const barcode = barcodeInput.value.trim();
+        if (barcode.length === 10 && barcode !== lastProcessedBarcode && !isClaiming) {
+            processClaim(barcode);
+        }
+      });
+
+      barcodeInput.addEventListener('keypress', async (e) => {
+        if (e.key === 'Enter') {
+          const barcode = barcodeInput.value.trim();
+          if (barcode && !isClaiming) processClaim(barcode);
+        }
+      });
+
+      async function processClaim(barcode) {
+        if (isClaiming) return;
+        const username = sessionStorage.getItem('username');
+        console.log('Using username for claim:', username);
+        if (!username) { showClaimStatus({ status: false, message: 'Please login first.' }); return; }
+
+        isClaiming = true;
+        lastProcessedBarcode = barcode;
+        barcodeInput.disabled = true;
+
+        try {
+          // Use the global API object
+          const res = await window.GWinAPI.claimTicket(barcode, username);
+          if (res && res.status) {
+            showClaimStatus(res);
+            barcodeInput.value = '';
+            lastProcessedBarcode = '';
+            if (typeof updateBalanceFromServer === 'function') {
+                updateBalanceFromServer(username);
+            }
+          } else {
+            showClaimStatus(res || { status: false, message: 'Invalid barcode.' });
+            barcodeInput.value = '';
+          }
+        } catch (err) {
+          console.error('Claim error:', err);
+          showClaimStatus({ status: false, message: 'Network error while claiming.' });
+        } finally {
+          isClaiming = false;
+          barcodeInput.disabled = false;
+          barcodeInput.focus();
+        }
+      }
+    }
+
+    document.addEventListener('DOMContentLoaded', () => {
+        initClaimInPage();
+    });
+  </script>
+</body>
+
+</html>
