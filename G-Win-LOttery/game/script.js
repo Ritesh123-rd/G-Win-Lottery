@@ -102,6 +102,19 @@ async function loadInitialResult() {
 async function updateWinningNumbers() {
   // Guard: agar popup pehle se chal raha hai to naya mat kholo
   if (isShowingResult) return;
+
+  // 1a. Check if any OTHER modal is currently open
+  const otherOverlays = document.querySelectorAll('.modal-overlay:not(#winning-modal)');
+  const anyOtherOpen = Array.from(otherOverlays).some(m => m.style.display === 'flex');
+
+  if (anyOtherOpen) {
+    console.log('Result suppressed: Another modal is open.');
+    // Still update the main dashboard silently
+    loadInitialResult();
+    updateDashboardHistory();
+    return;
+  }
+
   if (!window.GWinAPI || !window.GWinAPI.result) {
     console.warn('GWinAPI.result not found');
     return;
@@ -164,11 +177,18 @@ async function updateWinningNumbers() {
           winModal.style.display = 'none';
           winModal.classList.remove('modal-closing');
           isShowingResult = false;
-          location.reload(); // Popup band hone ke baad page reload
+          
+          // Soft reset instead of reload
+          clearAllBets();
+          const username = sessionStorage.getItem('username');
+          if (username) {
+            updateBalanceFromServer(username);
+            updateDashboardHistory();
+          }
         }, 1000);
       } else {
         isShowingResult = false;
-        location.reload();
+        clearAllBets();
       }
     } else {
       console.warn('Invalid result data:', data);
@@ -213,8 +233,9 @@ setInterval(() => {
     if (username) updateBalanceFromServer(username);
   }
 
-  // Reload triggers at start of new cycle — lekin sirf jab popup na dikha raha ho
-  if ((countdownSeconds === 299 || countdownSeconds === 297) && !isShowingResult) {
+  // Reload triggers at start of new cycle — lekin sirf jab popup na dikha raha ho AUR koi modal open na ho
+  const anyOpen = Array.from(document.querySelectorAll('.modal-overlay')).some(m => m.style.display === 'flex');
+  if ((countdownSeconds === 299 || countdownSeconds === 297) && !anyOpen) {
     location.reload();
   }
 
@@ -253,6 +274,123 @@ let currentChipValue = 0;
 let totalBetPoints = 0;
 let selectedAdvanceTime = []; // Changed to array for multiple selection
 
+// Satta Matka Sorting: 0 is considered the largest digit (value 10)
+function sattaSort(a, b) {
+  let v1 = parseInt(a) === 0 ? 10 : parseInt(a);
+  let v2 = parseInt(b) === 0 ? 10 : parseInt(b);
+  return v1 - v2;
+}
+
+/* ── FP & CP Logic State ─────────────────────────────────────────── */
+let isFPOn = false;
+let currentFPFamily = [];
+const fpCorners = [0, 5, 50, 55]; // Last two digits
+
+let isCPOn = false;
+let currentCPFamily = [];
+
+/**
+ * CP (Cycle Pana) Logic: Returns a family of 10 panas sharing the same CP pair.
+ * Based on Dpboss logic: CP is any two digits of a Pana. 
+ * We use the first two digits of the clicked Pana as the CP pair.
+ */
+function getCPFamily(baseNum) {
+  const s = String(baseNum).padStart(3, '0');
+  const d1 = parseInt(s[0]);
+  const d2 = parseInt(s[1]);
+  
+  const family = [];
+  for (let z = 0; z <= 9; z++) {
+    const sorted = [d1, d2, z].sort(sattaSort);
+    family.push(sorted.join(''));
+  }
+  return [...new Set(family)]; 
+}
+
+/**
+ * Returns the family of numbers based on mirror and transpose logic (FP)
+ */
+function getFPFamily(baseNum) {
+  const num = parseInt(baseNum);
+  if (isNaN(num)) return [baseNum];
+
+  const rangeStart = Math.floor(num / 100) * 100;
+  const n = num % 100;
+  const r = Math.floor(n / 10);
+  const c = n % 10;
+
+  const rBase = r % 5;
+  const cBase = c % 5;
+  const family = [];
+
+  // Standard 4-number mirror set
+  family.push(rangeStart + (rBase * 10) + cBase);
+  family.push(rangeStart + (rBase * 10) + cBase + 5);
+  family.push(rangeStart + ((rBase + 5) * 10) + cBase);
+  family.push(rangeStart + ((rBase + 5) * 10) + cBase + 5);
+
+  // Transposed set if rBase != cBase
+  if (rBase !== cBase) {
+    family.push(rangeStart + (cBase * 10) + rBase);
+    family.push(rangeStart + (cBase * 10) + rBase + 5);
+    family.push(rangeStart + ((cBase + 5) * 10) + rBase);
+    family.push(rangeStart + ((cBase + 5) * 10) + rBase + 5);
+  }
+
+  // Handle cross-grid mirrors if needed? 
+  // In the original game, it seemed to stay within the same 100-range.
+  // We'll keep it within the 100-range (rangeStart).
+  
+  return [...new Set(family)]; // Unique numbers only
+}
+
+/**
+ * Highlights FP/CP corners and the currently focused family
+ */
+function updateModeVisuals() {
+  const allElements = document.querySelectorAll('.grid-item, .header-cell');
+  
+  allElements.forEach(el => {
+    const numEl = el.querySelector('.item-num, .header-num');
+    if (!numEl) return;
+    
+    const numStr = numEl.textContent;
+    const num = parseInt(numStr);
+    const lastTwo = num % 100;
+    
+    // Reset classes
+    el.classList.remove('fp-corner', 'fp-family', 'cp-family');
+    
+    if (isFPOn) {
+      if (currentFPFamily.includes(num)) {
+        el.classList.add('fp-family');
+      } else if (fpCorners.includes(lastTwo) && currentFPFamily.length === 0) {
+        el.classList.add('fp-corner');
+      }
+    } else if (isCPOn) {
+      const sNum = numStr.split('').sort(sattaSort).join('');
+      if (currentCPFamily.includes(sNum)) {
+        el.classList.add('cp-family');
+      }
+    }
+  });
+}
+
+// Cache for faster lookups
+let elementCache = null;
+
+function findElementByNum(num) {
+  if (!elementCache) {
+    elementCache = {};
+    const all = document.querySelectorAll('.grid-item, .header-cell');
+    all.forEach(el => {
+      const nEl = el.querySelector('.item-num, .header-num');
+      if (nEl) elementCache[parseInt(nEl.textContent)] = el;
+    });
+  }
+  return elementCache[parseInt(num)] || null;
+}
+
 function updateTotalBetPoints(amount) {
   totalBetPoints += amount;
   refreshTotalDisplay();
@@ -273,6 +411,7 @@ function refreshTotalDisplay() {
 
 /* ── Grid Builder ───────────────────────────────────────────── */
 function generateGrid(containerId, rows, headerNums, numList) {
+  elementCache = null; // Clear cache for new grid
   const container = document.getElementById(containerId);
   if (!container) return;
 
@@ -288,13 +427,49 @@ function generateGrid(containerId, rows, headerNums, numList) {
 
     cell.addEventListener('click', (e) => {
       highlightSidebar('.akdax');
-      handlePointAdjustment(cell, currentChipValue);
+      if (isFPOn) {
+        const family = getFPFamily(num);
+        currentFPFamily = family;
+        family.forEach(fNum => {
+          const item = findElementByNum(fNum);
+          if (item) handlePointAdjustment(item, currentChipValue);
+        });
+        updateModeVisuals();
+      } else if (isCPOn) {
+        const family = getCPFamily(num);
+        currentCPFamily = family;
+        family.forEach(fNum => {
+          const item = findElementByNum(fNum);
+          if (item) handlePointAdjustment(item, currentChipValue);
+        });
+        updateModeVisuals();
+      } else {
+        handlePointAdjustment(cell, currentChipValue);
+      }
     });
 
     cell.addEventListener('contextmenu', (e) => {
       e.preventDefault();
       highlightSidebar('.akdax');
-      handlePointAdjustment(cell, -currentChipValue);
+      if (isFPOn) {
+        const family = getFPFamily(num);
+        currentFPFamily = family;
+        family.forEach(fNum => {
+          const item = findElementByNum(fNum);
+          if (item) handlePointAdjustment(item, -currentChipValue);
+        });
+        updateModeVisuals();
+      } else if (isCPOn) {
+        const family = getCPFamily(num);
+        currentCPFamily = family;
+        family.forEach(fNum => {
+          const item = findElementByNum(fNum);
+          if (item) handlePointAdjustment(item, -currentChipValue);
+        });
+        updateModeVisuals();
+      } else {
+        handlePointAdjustment(cell, -currentChipValue);
+      }
     });
 
     header.appendChild(cell);
@@ -333,14 +508,50 @@ function generateGrid(containerId, rows, headerNums, numList) {
     item.addEventListener('click', (e) => {
       const sidebarClass = type === 'TRIPLE' ? '.title2' : (type === 'DP' ? '.title' : '.title1');
       highlightSidebar(sidebarClass);
-      handlePointAdjustment(item, currentChipValue);
+      if (isFPOn) {
+        const family = getFPFamily(num);
+        currentFPFamily = family;
+        family.forEach(fNum => {
+          const fItem = findElementByNum(fNum);
+          if (fItem) handlePointAdjustment(fItem, currentChipValue);
+        });
+        updateModeVisuals();
+      } else if (isCPOn) {
+        const family = getCPFamily(num);
+        currentCPFamily = family;
+        family.forEach(fNum => {
+          const fItem = findElementByNum(fNum);
+          if (fItem) handlePointAdjustment(fItem, currentChipValue);
+        });
+        updateModeVisuals();
+      } else {
+        handlePointAdjustment(item, currentChipValue);
+      }
     });
 
     item.addEventListener('contextmenu', (e) => {
       e.preventDefault();
       const sidebarClass = type === 'TRIPLE' ? '.title2' : (type === 'DP' ? '.title' : '.title1');
       highlightSidebar(sidebarClass);
-      handlePointAdjustment(item, -currentChipValue);
+      if (isFPOn) {
+        const family = getFPFamily(num);
+        currentFPFamily = family;
+        family.forEach(fNum => {
+          const fItem = findElementByNum(fNum);
+          if (fItem) handlePointAdjustment(fItem, -currentChipValue);
+        });
+        updateModeVisuals();
+      } else if (isCPOn) {
+        const family = getCPFamily(num);
+        currentCPFamily = family;
+        family.forEach(fNum => {
+          const fItem = findElementByNum(fNum);
+          if (fItem) handlePointAdjustment(fItem, -currentChipValue);
+        });
+        updateModeVisuals();
+      } else {
+        handlePointAdjustment(item, -currentChipValue);
+      }
     });
 
     column.appendChild(item);
@@ -623,6 +834,7 @@ function initChips() {
 
 /* ── Action Buttons ──────────────────────────────────────────── */
 function initActionButtons() {
+
   document.querySelectorAll('.action-btn').forEach(btn => {
     btn.addEventListener('click', () => {
       const label = btn.title ? btn.title.toUpperCase() : '';
@@ -630,17 +842,7 @@ function initActionButtons() {
 
       if (btn.classList.contains('clear')) {
         console.log('Clearing ALL bets...');
-        document.querySelectorAll('.grid-item.selected, .header-cell.selected').forEach(el => {
-          el.classList.remove('selected');
-          const ptsEl = el.querySelector('.item-pts');
-          if (ptsEl) ptsEl.textContent = '';
-        });
-        totalBetPoints = 0;
-        updateTotalBetPoints(0);
-        refreshTotalDisplay();
-
-        const bc = document.querySelector('.barcode-input');
-        if (bc) bc.value = '';
+        clearAllBets();
       } else if (btn.classList.contains('buy')) {
         handleBuy();
       } else {
@@ -648,6 +850,20 @@ function initActionButtons() {
       }
     });
   });
+}
+
+function clearAllBets() {
+  document.querySelectorAll('.grid-item.selected, .header-cell.selected').forEach(el => {
+    el.classList.remove('selected');
+    const ptsEl = el.querySelector('.item-pts');
+    if (ptsEl) ptsEl.textContent = '';
+  });
+  totalBetPoints = 0;
+  updateTotalBetPoints(0);
+  refreshTotalDisplay();
+
+  const bc = document.querySelector('.barcode-input');
+  if (bc) bc.value = '';
 }
 
 /**
@@ -726,8 +942,13 @@ async function handleBuy() {
       selectedAdvanceTime = [];
       const advanceContainer = document.getElementById('advance-slots-container');
       if (advanceContainer) {
-        advanceContainer.querySelectorAll('.slot-item').forEach(s => s.classList.remove('selected'));
+        advanceContainer.querySelectorAll('.slot-item').forEach(s => {
+          s.classList.remove('selected');
+          const cb = s.querySelector('input[type="checkbox"]');
+          if (cb) cb.checked = false;
+        });
       }
+      if (advCountBadge) advCountBadge.textContent = '0';
 
     } else {
       alert('Failed to place bet: ' + (result.message || 'Unknown error'));
@@ -830,8 +1051,35 @@ function initSidebar() {
 
 /* ── F12 → focus barcode input ───────────────────────────────── */
 /* ── F12 → focus barcode input ───────────────────────────────── */
-function initBarcode() {
-  // Logic moved to index.html as per request
+function initFPAndCP() {
+  const fpBtn = document.getElementById('fp-logic-btn');
+  const cpBtn = document.querySelector('.action-btn.cp'); // Restored original selector
+
+  if (fpBtn) {
+    fpBtn.addEventListener('click', () => {
+      isFPOn = !isFPOn;
+      if (isFPOn) isCPOn = false; 
+      fpBtn.classList.toggle('active', isFPOn);
+      if (cpBtn) cpBtn.classList.remove('active');
+      
+      currentFPFamily = [];
+      currentCPFamily = [];
+      updateModeVisuals();
+    });
+  }
+
+  if (cpBtn) {
+    cpBtn.addEventListener('click', () => {
+      isCPOn = !isCPOn;
+      if (isCPOn) isFPOn = false; 
+      cpBtn.classList.toggle('active', isCPOn); // Using .active to show high-gloss highlight
+      if (fpBtn) fpBtn.classList.remove('active');
+      
+      currentFPFamily = [];
+      currentCPFamily = [];
+      updateModeVisuals();
+    });
+  }
 }
 
 /* ── Mobile Grid Toggle ──────────────────────────────────────── */
@@ -961,8 +1209,8 @@ document.addEventListener('DOMContentLoaded', async () => {
   }
 
   initActionButtons();
+  initFPAndCP();
   initSidebar();
-  initBarcode();
   initMobileGridToggle();
   await initResponsiveLayout();
 
@@ -975,6 +1223,7 @@ document.addEventListener('DOMContentLoaded', async () => {
   updateDashboardHistory(); // Load initial history on page load
 
   initLogout();
+  initRefresh();
   initUserSession();
 
   // Recalibrate on resize to keep numbers centered
@@ -1015,13 +1264,25 @@ function _applySpinToReels(reelSet, targetString, instant) {
   const refReel = reelSet.find(r => r !== null && r !== undefined);
   if (!refReel) return;
 
-  // Pehle khud ki height lo (popup visible hone ke baad accurate hoti hai)
-  // Fallback: main reel #reel-1 ki height (hamesha visible)
-  const ownSpan = refReel.querySelector('span');
-  const ownH = ownSpan ? ownSpan.offsetHeight : 0;
-  const mainSpan = document.querySelector('#reel-1 span');
-  const mainH = mainSpan ? mainSpan.offsetHeight : 100;
-  const symbolHeight = ownH > 0 ? ownH : mainH;
+  // Get symbol height from computed style or direct measurement
+  const getSymbolHeight = (reel) => {
+    const span = reel.querySelector('span');
+    if (span && span.offsetHeight > 0) return span.offsetHeight;
+    
+    // Fallback to CSS variable if hidden
+    const style = getComputedStyle(reel.closest('.big-display'));
+    const varH = style.getPropertyValue('--reel-inner-h');
+    if (varH) {
+      if (varH.includes('px')) return parseFloat(varH);
+      // If it's a clamp or calc, we need a temporary measurement or reasonable fallback
+    }
+    
+    // Last resort fallback based on common design
+    return 100; 
+  };
+
+  const symbolHeight = getSymbolHeight(refReel);
+  const mainH = 100; // Legacy unused
 
   reelSet.forEach((reel, index) => {
     if (!reel) return;
@@ -1073,10 +1334,6 @@ function spinPopupReels(targetString) {
 /* --- Reprint Modal Logic --- */
 const reprintBtn = document.querySelector('.action-btn.reprint');
 const reprintModal = document.getElementById('reprint-modal');
-const closeBtn = document.getElementById('close-reprint');
-const closeFooter = document.getElementById('close-footer');
-const reprintDateInput = document.getElementById('reprint-date-input');
-const fetchReprintBtn = document.getElementById('fetch-reprint-btn');
 
 /* winning modal close */
 const winModal = document.getElementById('winning-modal');
@@ -1086,109 +1343,65 @@ const winOkBtn = document.getElementById('winning-ok-btn');
 if (closeWinBtn) closeWinBtn.addEventListener('click', () => { winModal.style.display = 'none'; });
 if (winOkBtn) winOkBtn.addEventListener('click', () => { winModal.style.display = 'none'; });
 
-// Open
-reprintBtn.addEventListener('click', async () => {
-  reprintModal.style.display = 'flex';
+async function loadReprintTickets() {
+  const tbody = document.getElementById('reprint-tbody');
+  if (!tbody) return;
 
-  const listContainer = document.querySelector('.reprint-list');
+  tbody.innerHTML = '<tr><td colspan="6" style="text-align:center;padding:16px;color:#555;">Loading...</td></tr>';
 
-  // Set default date to today
-  if (reprintDateInput && !reprintDateInput.value) {
+  const username = sessionStorage.getItem('username');
+  if (!username) {
+    tbody.innerHTML = '<tr><td colspan="6" style="text-align:center;padding:16px;color:#555;">Please login first.</td></tr>';
+    return;
+  }
+
+  try {
+    // Aaj ki date auto-set karke getBetHistory call karo
     const today = new Date().toISOString().split('T')[0];
-    reprintDateInput.value = today;
-  }
+    const result = await window.GWinAPI.getBetHistory(username, today);
 
-  // Fetch today's results by default if list is empty or mock
-  if (listContainer && (listContainer.children.length === 0 || listContainer.innerHTML.includes('Please select'))) {
-    if (fetchReprintBtn) fetchReprintBtn.click();
+    if (result && result.tickets && result.tickets.length > 0) {
+      tbody.innerHTML = '';
+      result.tickets.forEach(ticket => {
+        const isActive = String(ticket.claim_status) === '0';
+        const statusText = isActive ? 'Active' : 'Not Active';
+        const tr = document.createElement('tr');
+        tr.innerHTML = `
+          <td><input type="checkbox" class="rp-check" data-barcode="${ticket.barcode}"></td>
+          <td>${ticket.bet_time || '--'}</td>
+          <td>${ticket.barcode || '--'}</td>
+          <td>${ticket.barcode || '--'}</td>
+          <td>${ticket.amount !== undefined ? ticket.amount : '--'}</td>
+          <td>${statusText}</td>
+        `;
+        tbody.appendChild(tr);
+      });
+    } else {
+      tbody.innerHTML = '<tr><td colspan="6" style="text-align:center;padding:16px;color:#555;">No tickets found.</td></tr>';
+    }
+  } catch (err) {
+    console.error('Reprint load error:', err);
+    tbody.innerHTML = '<tr><td colspan="6" style="text-align:center;padding:16px;color:#555;">Error loading tickets.</td></tr>';
   }
+}
+
+// Open reprint modal
+reprintBtn.addEventListener('click', () => {
+  reprintModal.style.display = 'flex';
+  loadReprintTickets();
 });
 
-if (fetchReprintBtn) {
-  fetchReprintBtn.addEventListener('click', async () => {
-    const listContainer = document.querySelector('.reprint-list');
-    const dateVal = reprintDateInput.value;
-
-    if (!dateVal) {
-      alert('Please select a date.');
-      return;
-    }
-
-    if (listContainer) {
-      listContainer.innerHTML = '<div style="color: white; padding: 20px; text-align: center;">Loading tickets...</div>';
-    }
-
-    const username = sessionStorage.getItem('username');
-    if (!username) {
-      if (listContainer) listContainer.innerHTML = '<div style="color: white; padding: 20px; text-align: center;">Please login first.</div>';
-      return;
-    }
-
-    try {
-      const result = window.GWinAPI ? await window.GWinAPI.getBetHistory(username, dateVal) : null;
-      if (result && result.tickets) {
-        if (listContainer) {
-          if (result.tickets.length === 0) {
-            listContainer.innerHTML = '<div style="color: white; padding: 20px; text-align: center;">No tickets found.</div>';
-          } else {
-            let tableHtml = `
-              <table class="modal-table">
-                <thead>
-                  <tr>
-                    <th>Time</th>
-                    <th>Barcode</th>
-                    <th>Amount</th>
-                    <th>Win</th>
-                    <th>Status</th>
-                    <th>Action</th>
-                  </tr>
-                </thead>
-                <tbody>
-            `;
-
-            result.tickets.forEach(ticket => {
-              let claimText = ticket.claim_status;
-              let statusClass = "status-unclaimed";
-              if (String(ticket.claim_status) === "1") {
-                claimText = "Claimed";
-                statusClass = "status-claimed";
-              } else if (String(ticket.claim_status) === "0") {
-                claimText = "Unclaimed";
-              }
-
-              tableHtml += `
-                <tr>
-                  <td>${ticket.bet_time || '--'}</td>
-                  <td style="color: gold; font-weight: 800;">${ticket.barcode || '--'}</td>
-                  <td>${ticket.amount !== undefined ? ticket.amount : '--'}</td>
-                  <td style="color: #4CAF50;">${ticket.win_amt !== undefined ? ticket.win_amt : '--'}</td>
-                  <td class="${statusClass}">${claimText}</td>
-                  <td><button class="rep-btn" data-barcode="${ticket.barcode}">Reprint</button></td>
-                </tr>
-              `;
-            });
-
-            tableHtml += '</tbody></table>';
-            listContainer.innerHTML = tableHtml;
-
-            // Add event listeners for reprint buttons
-            listContainer.querySelectorAll('.rep-btn').forEach(btn => {
-              btn.addEventListener('click', (e) => {
-                const bc = e.target.getAttribute('data-barcode');
-                printCustomTicket(username, bc);
-              });
-            });
-          }
-        }
-      } else {
-        if (listContainer) listContainer.innerHTML = '<div style="color: white; padding: 20px; text-align: center;">Failed to load tickets.</div>';
-      }
-    } catch (error) {
-      console.error("Error fetching bet history", error);
-      if (listContainer) listContainer.innerHTML = '<div style="color: white; padding: 20px; text-align: center;">Error loading tickets.</div>';
-    }
-  });
-}
+// PRINT selected tickets
+document.getElementById('rp-print-btn').addEventListener('click', () => {
+  const username = sessionStorage.getItem('username');
+  const checked = document.querySelectorAll('.rp-check:checked');
+  if (checked.length === 0) {
+    alert('Please select at least one ticket to print.');
+    return;
+  }
+  const barcodes = Array.from(checked).map(cb => cb.getAttribute('data-barcode'));
+  printCustomTicket(username, barcodes);
+});
 
 /* --- Smart Print Ticket Logic --- */
 async function printCustomTicket(username, barcodes) {
@@ -1204,53 +1417,33 @@ async function printCustomTicket(username, barcodes) {
     let allTicketsHtml = '';
 
     data.tickets.forEach((ticket, tIdx) => {
-      let totalQty = 0;
-      ticket.bet_lines.forEach(line => {
-        totalQty += parseInt(line.qty) || 0;
-      });
-
-      // Build the grid rows (3 cols of Num|Qty)
-      let gridHtml = '';
+      // Build bet lines as "num*qty" groups of 3 per row separated by " | "
       const lines = ticket.bet_lines;
+      let betRowsHtml = '';
       for (let i = 0; i < lines.length; i += 3) {
-        gridHtml += '<tr>';
+        const rowItems = [];
         for (let j = 0; j < 3; j++) {
           if (i + j < lines.length) {
-            gridHtml += `<td>${lines[i + j].num}</td><td>${lines[i + j].qty}</td>`;
-          } else {
-            gridHtml += `<td></td><td></td>`;
+            rowItems.push(`${lines[i + j].num}*${lines[i + j].qty}`);
           }
         }
-        gridHtml += '</tr>';
+        betRowsHtml += `<div class="bet-row">${rowItems.join(' | ')}</div>`;
       }
 
       const ticketHtml = `
-        <div class="ticket" style="${tIdx > 0 ? 'page-break-before: always; padding-top: 50px;' : ''}">
-          <div class="title">G WIN</div>
-          <div class="subtitle">(Ticket valid for 10 days)</div>
-          <div class="divider"></div>
-          <div class="info">
-            <div>Game Date : ${ticket.record_date}</div>
-            <div>Draw Time : ${ticket.draw_time}</div>
-            <div>Ticket Time : ${ticket.tck_time}</div>
-            <div>Retailer ID : ${ticket.username}</div>
-            <div>Total Point : ${ticket.amount}</div>
-          </div>
-          <div class="divider"></div>
-          <table>
-            <thead>
-              <tr>
-                <th>Num</th><th>Qty</th>
-                <th>Num</th><th>Qty</th>
-                <th>Num</th><th>Qty</th>
-              </tr>
-            </thead>
-            <tbody>
-              ${gridHtml}
-            </tbody>
-          </table>
-          <div class="barcode-container">
+        <div class="ticket" style="${tIdx > 0 ? 'page-break-before: always;' : ''}">
+          <div class="t-brand">GwinP</div>
+          <div class="t-amuse">[For Amusement Only]</div>
+          <div class="t-info">NAME : ${ticket.username || '--'}</div>
+          <div class="t-info">BARCODE : ${ticket.barcode || '--'}</div>
+          <div class="t-info">Play Date : ${ticket.record_date || '--'}</div>
+          <div class="t-info">Play Draw: ${ticket.draw_time || '--'}</div>
+          <div class="t-section">METRO TIMER</div>
+          <div class="bet-grid">${betRowsHtml}</div>
+          <div class="t-total">Total Points: ${ticket.amount || '--'}</div>
+          <div class="barcode-wrap">
             <img src="https://barcode.tec-it.com/barcode.ashx?data=${ticket.barcode}&code=Code128&dpi=96" alt="Barcode" />
+            
           </div>
         </div>
       `;
@@ -1263,9 +1456,8 @@ async function printCustomTicket(username, barcodes) {
         <title>Print Tickets</title>
         <style>
           @media print {
-            @page { margin: 0; margin-top: 40px; }
-            @page:first { margin-top: 0; }
-            body { margin: 0; padding: 5px; }
+            @page { size: 58mm auto; margin: 4mm; }
+            body { margin: 0; padding: 0; }
           }
           body {
             font-family: 'Courier New', monospace;
@@ -1273,32 +1465,68 @@ async function printCustomTicket(username, barcodes) {
             font-size: 11px;
             margin: 0;
             padding: 0;
-            display: flex;
-            flex-direction: column;
-            align-items: center;
+            background: #fff;
           }
           .ticket {
-            width: 190px;
-            padding: 2px;
+            width: 200px;
             margin: 0 auto;
+            padding: 6px 4px 10px;
+            text-align: center;
           }
-          .title { text-align: center; font-size: 14px; font-weight: bold; margin-bottom: 2px; }
-          .subtitle { text-align: center; font-size: 9px; margin-bottom: 5px; }
-          .divider { border-top: 1px dashed #000; margin: 4px 0; }
-          .info { font-size: 10px; line-height: 1.2; }
-          table { width: 100%; border-collapse: collapse; margin-top: 5px; font-size: 10px; border: 1px solid #000; }
-          th, td { border: 1px solid #000; text-align: center; padding: 2px 0px; font-weight: 600; }
-          .barcode-container { text-align: center; margin-top: 8px; }
-          .barcode-container img { max-width: 100%; height: 45px; }
+          .t-brand {
+            font-size: 18px;
+            font-weight: bold;
+            letter-spacing: 1px;
+            margin-bottom: 1px;
+          }
+          .t-amuse {
+            font-size: 10px;
+            margin-bottom: 6px;
+          }
+          .t-info {
+            text-align: center;
+            font-size: 11px;
+            line-height: 1.5;
+          }
+          .t-section {
+            font-size: 12px;
+            font-weight: bold;
+            margin: 6px 0 4px;
+            text-align: center;
+          }
+          .bet-grid {
+            text-align: center;
+          }
+          .bet-row {
+            font-size: 11px;
+            line-height: 1.6;
+          }
+          .t-total {
+            font-size: 12px;
+            font-weight: bold;
+            margin: 6px 0 4px;
+            text-align: center;
+          }
+          .barcode-wrap {
+            text-align: center;
+            margin-top: 6px;
+          }
+          .barcode-wrap img {
+            width: 180px;
+            height: 50px;
+          }
+          .barcode-num {
+            font-size: 11px;
+            letter-spacing: 1px;
+            margin-top: 2px;
+          }
         </style>
       </head>
       <body>
         ${allTicketsHtml}
         <script>
           window.onload = function() {
-            setTimeout(() => {
-              window.print();
-            }, 300);
+            setTimeout(() => { window.print(); }, 400);
           }
         </script>
       </body>
@@ -1333,8 +1561,7 @@ async function printCustomTicket(username, barcodes) {
 // close helpers
 const hideModal = () => { reprintModal.style.display = 'none'; };
 
-closeBtn.addEventListener('click', hideModal);
-closeFooter.addEventListener('click', hideModal);
+document.getElementById('close-reprint').addEventListener('click', hideModal);
 
 window.addEventListener('click', (e) => {
   if (e.target === reprintModal) hideModal();
@@ -1351,14 +1578,14 @@ const closeCancleFooter = document.getElementById('close-cancel-footer');
 cancleBtn.addEventListener('click', async () => {
   cancleModal.style.display = 'flex';
 
-  const listContainer = document.querySelector('.cancel-list');
+  const listContainer = document.getElementById('cancel-list-container');
   if (listContainer) {
-    listContainer.innerHTML = '<div style="color: white; padding: 20px; text-align: center;">Loading...</div>';
+    listContainer.innerHTML = '<div style="color: #666; padding: 20px; text-align: center;">Loading tickets...</div>';
   }
 
   const username = sessionStorage.getItem('username');
   if (!username) {
-    if (listContainer) listContainer.innerHTML = '<div style="color: white; padding: 20px; text-align: center;">Please login first.</div>';
+    if (listContainer) listContainer.innerHTML = '<div style="color: #666; padding: 20px; text-align: center;">Please login first.</div>';
     return;
   }
 
@@ -1367,7 +1594,7 @@ cancleBtn.addEventListener('click', async () => {
     if (result && result.tickets) {
       if (listContainer) {
         if (result.tickets.length === 0) {
-          listContainer.innerHTML = '<div style="color: white; padding: 20px; text-align: center;">No tickets to cancel.</div>';
+          listContainer.innerHTML = '<div style="color: #666; padding: 20px; text-align: center;">No tickets found for current draws.</div>';
         } else {
           let tableHtml = `
             <table class="modal-table">
@@ -1383,23 +1610,23 @@ cancleBtn.addEventListener('click', async () => {
               <tbody>
           `;
 
-            result.tickets.forEach(ticket => {
-              tableHtml += `
+          result.tickets.forEach(ticket => {
+            tableHtml += `
                 <tr>
-                  <td>${ticket.bet_time || '--'}</td>
-                  <td style="color: gold;">${ticket.barcode || '--'}</td>
-                  <td>${ticket.draw_times || '--'}</td>
-                  <td style="color: gold;">${ticket.amount !== undefined ? ticket.amount : '--'}</td>
-                  <td><button class="can-btn" data-id="${ticket.id}">Cancel</button></td>
+                  <td style="color: rgba(0, 0, 0, 1); font-weight:800;">${ticket.bet_time || '--'}</td>
+                  <td style="color: rgba(0, 0, 0, 1); font-weight:800;">${ticket.barcode || '--'}</td>
+                  <td style="color: rgba(0, 0, 0, 1); font-weight:800;">${ticket.draw_times || '--'}</td>
+                  <td style="color: rgba(0, 0, 0, 1); font-weight:800;">${ticket.amount !== undefined ? ticket.amount : '--'}</td>
+                  <td><button class="cancel-row-btn" data-id="${ticket.id}">Cancel</button></td>
                 </tr>
               `;
-            });
+          });
 
-            tableHtml += '</tbody></table>';
-            listContainer.innerHTML = tableHtml;
+          tableHtml += '</tbody></table>';
+          listContainer.innerHTML = tableHtml;
 
           // Add event listeners for cancel buttons
-          listContainer.querySelectorAll('.can-btn').forEach(btn => {
+          listContainer.querySelectorAll('.cancel-row-btn').forEach(btn => {
             btn.addEventListener('click', async (e) => {
               const ticketId = e.target.getAttribute('data-id');
               if (confirm('Are you sure you want to cancel this ticket?')) {
@@ -1446,71 +1673,57 @@ window.addEventListener('click', (e) => {
 const advanceBtn = document.querySelector('.action-btn.advance');
 const advanceModal = document.getElementById('advance-modal');
 const closeAdvanceBtn = document.getElementById('close-advance');
-const closeAdvanceFooter = document.getElementById('close-advance-footer');
-const submitAdvanceBtn = document.getElementById('submit-advance');
-const selectAllAdvanceBtn = document.getElementById('advance-select-all');
-const clearAdvanceBtn = document.getElementById('advance-clear');
 const advanceCountInput = document.getElementById('advance-count-input');
+const selectAllAdvanceBtn = document.getElementById('advance-select-all');
+const advCountBadge = document.getElementById('adv-selected-count');
 
-if (submitAdvanceBtn) {
-  submitAdvanceBtn.addEventListener('click', () => {
-    hideAdvanceModal();
-  });
+function updateAdvCountBadge() {
+  if (advCountBadge) advCountBadge.textContent = selectedAdvanceTime.length;
 }
 
-// Select All
+function setSlotSelected(div, slot, isSelected) {
+  const cb = div.querySelector('input[type="checkbox"]');
+  if (isSelected) {
+    div.classList.add('selected');
+    if (cb) cb.checked = true;
+    if (!selectedAdvanceTime.includes(slot)) selectedAdvanceTime.push(slot);
+  } else {
+    div.classList.remove('selected');
+    if (cb) cb.checked = false;
+    selectedAdvanceTime = selectedAdvanceTime.filter(s => s !== slot);
+  }
+}
+
+// Enter Ad. Draw button — select by count input
 if (selectAllAdvanceBtn) {
   selectAllAdvanceBtn.addEventListener('click', () => {
+    const qty = parseInt(advanceCountInput ? advanceCountInput.value : 0) || 0;
     const slots = document.querySelectorAll('.slot-item');
     selectedAdvanceTime = [];
-    slots.forEach(s => {
-      s.classList.add('selected');
-      selectedAdvanceTime.push(s.textContent.trim());
+    slots.forEach((div, idx) => {
+      const slot = div.getAttribute('data-slot');
+      setSlotSelected(div, slot, idx < qty);
     });
+    updateAdvCountBadge();
     refreshTotalDisplay();
   });
 }
 
-// Clear
-if (clearAdvanceBtn) {
-  clearAdvanceBtn.addEventListener('click', () => {
-    const slots = document.querySelectorAll('.slot-item');
-    selectedAdvanceTime = [];
-    slots.forEach(s => {
-      s.classList.remove('selected');
-    });
-    if (advanceCountInput) advanceCountInput.value = '';
-    refreshTotalDisplay();
-  });
-}
-
-// Select Quantity
+// Count input — auto select on Enter key
 if (advanceCountInput) {
-  advanceCountInput.addEventListener('input', (e) => {
-    const qty = parseInt(e.target.value) || 0;
-    const slots = document.querySelectorAll('.slot-item');
-    selectedAdvanceTime = [];
-    slots.forEach((s, idx) => {
-      if (idx < qty) {
-        s.classList.add('selected');
-        selectedAdvanceTime.push(s.textContent.trim());
-      } else {
-        s.classList.remove('selected');
-      }
-    });
-    refreshTotalDisplay();
+  advanceCountInput.addEventListener('keydown', (e) => {
+    if (e.key === 'Enter') selectAllAdvanceBtn && selectAllAdvanceBtn.click();
   });
 }
 
 // Open
 advanceBtn.addEventListener('click', async () => {
   advanceModal.style.display = 'flex';
-
   if (advanceCountInput) advanceCountInput.value = '';
 
   const container = document.getElementById('advance-slots-container');
   if (container) {
-    container.innerHTML = '<div style="color: white; padding: 20px; text-align: center; grid-column: 1/-1;">Loading slots...</div>';
+    container.innerHTML = '<div style="color:#555; padding: 20px; text-align: center; grid-column: 1/-1;">Loading slots...</div>';
   }
 
   try {
@@ -1521,32 +1734,40 @@ advanceBtn.addEventListener('click', async () => {
         result.slots.forEach(slot => {
           const div = document.createElement('div');
           div.className = 'slot-item';
-          if (selectedAdvanceTime.includes(slot)) div.classList.add('selected');
-          div.textContent = slot;
+          div.setAttribute('data-slot', slot);
+
+          const cb = document.createElement('input');
+          cb.type = 'checkbox';
+          cb.tabIndex = -1;
+
+          const label = document.createElement('span');
+          label.textContent = slot;
+
+          div.appendChild(cb);
+          div.appendChild(label);
+
+          if (selectedAdvanceTime.includes(slot)) {
+            div.classList.add('selected');
+            cb.checked = true;
+          }
 
           div.addEventListener('click', () => {
-            // Multiple Selection Logic
-            if (selectedAdvanceTime.includes(slot)) {
-              // Remove if already selected
-              selectedAdvanceTime = selectedAdvanceTime.filter(s => s !== slot);
-              div.classList.remove('selected');
-            } else {
-              // Add to selected
-              selectedAdvanceTime.push(slot);
-              div.classList.add('selected');
-            }
-            refreshTotalDisplay(); // Update footer total
-            console.log('Current Selected Advance Times:', selectedAdvanceTime);
+            const isNowSelected = !div.classList.contains('selected');
+            setSlotSelected(div, slot, isNowSelected);
+            updateAdvCountBadge();
+            refreshTotalDisplay();
           });
+
           container.appendChild(div);
         });
+        updateAdvCountBadge();
       }
     } else {
-      if (container) container.innerHTML = '<div style="color: white; padding: 20px; text-align: center; grid-column: 1/-1;">Failed to load slots.</div>';
+      if (container) container.innerHTML = '<div style="color:#555; padding: 20px; text-align: center; grid-column: 1/-1;">Failed to load slots.</div>';
     }
   } catch (err) {
     console.error('Error fetching advance times:', err);
-    if (container) container.innerHTML = '<div style="color: white; padding: 20px; text-align: center; grid-column: 1/-1;">Error loading slots.</div>';
+    if (container) container.innerHTML = '<div style="color:#555; padding: 20px; text-align: center; grid-column: 1/-1;">Error loading slots.</div>';
   }
 });
 
@@ -1554,7 +1775,6 @@ advanceBtn.addEventListener('click', async () => {
 const hideAdvanceModal = () => { advanceModal.style.display = 'none'; };
 
 closeAdvanceBtn.addEventListener('click', hideAdvanceModal);
-closeAdvanceFooter.addEventListener('click', hideAdvanceModal);
 
 window.addEventListener('click', (e) => {
   if (e.target === advanceModal) hideAdvanceModal();
@@ -1608,6 +1828,15 @@ function initLogout() {
       window.location.href = '../index.html';
     }
   });
+}
+
+function initRefresh() {
+  const refreshBtn = document.getElementById('refreshBtn');
+  if (refreshBtn) {
+    refreshBtn.addEventListener('click', () => {
+      location.reload();
+    });
+  }
 }
 
 async function initUserSession() {
@@ -1683,106 +1912,89 @@ async function updateBalanceFromServer(username) {
 (function () {
   const resultBtn = document.querySelector('.action-btn.result');
   const resultModal = document.getElementById('result-modal');
-
   if (!resultBtn || !resultModal) return;
 
   const closeResultBtn = document.getElementById('close-result');
-  const closeResultFooter = document.getElementById('close-result-footer');
-  const fetchResultBtn = document.getElementById('fetch-result-btn');
   const resultDateInput = document.getElementById('result-date-input');
+  const resDisplayDate = document.getElementById('res-display-date');
+  const resCalBtn = document.getElementById('res-cal-btn');
+  const resPrevBtn = document.getElementById('res-prev-btn');
+  const resNextBtn = document.getElementById('res-next-btn');
   const resultListContainer = document.getElementById('result-list-container');
 
-  // Set default date to today
-  if (resultDateInput) {
-    const today = new Date().toISOString().split('T')[0];
-    resultDateInput.value = today;
+  // Current date tracker
+  let currentDate = new Date().toISOString().split('T')[0];
+
+  function formatDisplayDate(dateStr) {
+    return dateStr; // already YYYY-MM-DD like screenshot
   }
 
-  // Open
+  function changeDate(offset) {
+    const d = new Date(currentDate);
+    d.setDate(d.getDate() + offset);
+    currentDate = d.toISOString().split('T')[0];
+    resDisplayDate.textContent = formatDisplayDate(currentDate);
+    fetchResults(currentDate);
+  }
+
+  async function fetchResults(dateVal) {
+    resultListContainer.innerHTML = '<div class="res-loading">Loading...</div>';
+    try {
+      if (!window.GWinAPI || !window.GWinAPI.resultDateWise) throw new Error('API not found');
+      const data = await window.GWinAPI.resultDateWise(dateVal);
+      if (data && data.status && data.results && data.results.length > 0) {
+        resultListContainer.innerHTML = '';
+        data.results.forEach(item => {
+          const parts = item.result ? item.result.split(',') : ['--', '--'];
+          const big = (parts[0] || '--').trim().substring(0, 3);
+          const small = (parts[1] || '--').trim();
+          const card = document.createElement('div');
+          card.className = 'res-card';
+          card.innerHTML = `
+            <span class="res-card-time">${item.time || '--'}</span>
+            <span class="res-card-big">${big}</span>
+            <span class="res-card-small">${small}</span>
+          `;
+          resultListContainer.appendChild(card);
+        });
+      } else {
+        resultListContainer.innerHTML = '<div class="res-loading">No results found for this date.</div>';
+      }
+    } catch (err) {
+      console.error('Fetch result error:', err);
+      resultListContainer.innerHTML = '<div class="res-loading">Error connecting to server.</div>';
+    }
+  }
+
+  // Open modal
   resultBtn.addEventListener('click', (e) => {
     e.preventDefault();
-    console.log('Opening Result Modal...');
+    currentDate = new Date().toISOString().split('T')[0];
+    resDisplayDate.textContent = formatDisplayDate(currentDate);
     resultModal.style.display = 'flex';
-
-    // Fetch today's results by default if list is empty
-    if (resultListContainer && resultListContainer.children.length <= 1) {
-      fetchResultBtn.click();
-    }
+    fetchResults(currentDate);
   });
 
-  // Fetch Logic
-  if (fetchResultBtn) {
-    fetchResultBtn.addEventListener('click', async () => {
-      const dateVal = resultDateInput.value;
-      if (!dateVal) {
-        alert('Please select a date.');
-        return;
-      }
-
-      resultListContainer.innerHTML = '<div style="color: gold; text-align: center; padding: 20px;">Fetching results...</div>';
-
-      try {
-        if (!window.GWinAPI || !window.GWinAPI.resultDateWise) {
-          throw new Error('API method resultDateWise not found');
-        }
-        const data = await window.GWinAPI.resultDateWise(dateVal);
-        console.log('DateWise Results:', data);
-
-        if (data && data.status && data.results) {
-          if (data.results.length === 0) {
-            resultListContainer.innerHTML = '<div style="color: #999; text-align: center; padding: 20px;">No results found for this date.</div>';
-          } else {
-            let tableHtml = `
-              <table class="modal-table">
-                <thead>
-                  <tr>
-                    <th>Draw Time</th>
-                    <th>First Result</th>
-                    <th>Second Result</th>
-                  </tr>
-                </thead>
-                <tbody>
-            `;
-
-            data.results.forEach(item => {
-              const parts = item.result ? item.result.split(',') : ['--', '--'];
-              const big = parts[0] ? parts[0].trim() : '--';
-              const small = parts[1] ? parts[1].trim() : '--';
-
-              tableHtml += `
-                <tr>
-                  <td style="color: #aaa;">${item.time}</td>
-                  <td style="color: #ffd700; font-weight: 900; font-size: 16px;">${big}</td>
-                  <td><span class="badge-small">${small}</span></td>
-                </tr>
-              `;
-            });
-
-            tableHtml += '</tbody></table>';
-            resultListContainer.innerHTML = tableHtml;
-          }
-        } else {
-          resultListContainer.innerHTML = `<div style="color: #ff4d4d; text-align: center; padding: 20px;">${data.message || 'Failed to load results.'}</div>`;
-        }
-      } catch (err) {
-        console.error('Fetch result error:', err);
-        resultListContainer.innerHTML = '<div style="color: #ff4d4d; text-align: center; padding: 20px;">Error connecting to server.</div>';
+  // Calendar icon opens native date picker
+  if (resCalBtn && resultDateInput) {
+    resCalBtn.addEventListener('click', () => { resultDateInput.showPicker(); });
+    resultDateInput.addEventListener('change', () => {
+      if (resultDateInput.value) {
+        currentDate = resultDateInput.value;
+        resDisplayDate.textContent = formatDisplayDate(currentDate);
+        fetchResults(currentDate);
       }
     });
   }
 
-  function result6Wise() {
+  // Prev / Next day
+  if (resPrevBtn) resPrevBtn.addEventListener('click', () => changeDate(-1));
+  if (resNextBtn) resNextBtn.addEventListener('click', () => changeDate(1));
 
-
-  }
-
-  // Close helpers
+  // Close
   const hideResultModal = () => { resultModal.style.display = 'none'; };
   if (closeResultBtn) closeResultBtn.addEventListener('click', hideResultModal);
-  if (closeResultFooter) closeResultFooter.addEventListener('click', hideResultModal);
-  window.addEventListener('click', (e) => {
-    if (e.target === resultModal) hideResultModal();
-  });
+  window.addEventListener('click', (e) => { if (e.target === resultModal) hideResultModal(); });
 })();
 
 
