@@ -1821,11 +1821,14 @@ function initLogout() {
       await window.GWinAPI.logout(userId || '0');
       // We proceed with local logout regardless of API response for better UX
       sessionStorage.clear();
-      window.location.href = '../index.html';
+      // Set a flag so the dashboard knows NOT to auto-login immediately this one time
+      sessionStorage.setItem('just_logged_out', 'true');
+      window.location.href = '../../dashboard.html';
     } catch (error) {
       console.error('Logout Error:', error);
       sessionStorage.clear();
-      window.location.href = '../index.html';
+      sessionStorage.setItem('just_logged_out', 'true');
+      window.location.href = '../../dashboard.html';
     }
   });
 }
