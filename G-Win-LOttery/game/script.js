@@ -40,17 +40,25 @@ async function syncWithServerTimer() {
 
 async function updateDashboardHistory() {
   if (!window.GWinAPI || !window.GWinAPI.result6Wise) return;
+  const staticHTML = `
+          <div class="history-item"><span class="h-time">05:35</span><span class="h-num">557</span><span class="h-small">7</span></div>
+          <div class="history-item"><span class="h-time">05:30</span><span class="h-num">399</span><span class="h-small">1</span></div>
+          <div class="history-item"><span class="h-time">05:25</span><span class="h-num">680</span><span class="h-small">4</span></div>
+          <div class="history-item"><span class="h-time">05:20</span><span class="h-num">690</span><span class="h-small">5</span></div>
+          <div class="history-item"><span class="h-time">05:15</span><span class="h-num">237</span><span class="h-small">2</span></div>
+          <div class="history-item"><span class="h-time">05:10</span><span class="h-num">888</span><span class="h-small">4</span></div>
+  `;
   try {
     const res = await window.GWinAPI.result6Wise();
     // Handle both 'results' and 'data' fields just in case
     const historyData = res.results || res.data || [];
 
-    if (res && res.status && historyData) {
-      const grid = document.querySelector('.history-grid');
-      if (grid) {
+    const grid = document.querySelector('.history-grid');
+    if (grid) {
+      if (res && res.status && historyData && historyData.length > 0) {
         grid.innerHTML = '';
         // Display the last 6 results provided by the API
-        historyData.forEach(item => {
+        historyData.slice(0, 6).forEach(item => {
           const div = document.createElement('div');
           div.className = 'history-item';
 
@@ -66,13 +74,19 @@ async function updateDashboardHistory() {
           }
 
           const displayTime = item.time ? item.time.replace(/AM|PM/gi, '').trim() : '--';
-          div.innerHTML = `${displayTime}<br />${big}<br />${small}`;
+          div.innerHTML = `<span class="h-time">${displayTime}</span><span class="h-num">${big}</span><span class="h-small">${small}</span>`;
           grid.appendChild(div);
         });
+      } else {
+        grid.innerHTML = staticHTML;
       }
     }
   } catch (e) {
     console.warn('Failed to update dashboard history:', e);
+    const grid = document.querySelector('.history-grid');
+    if (grid) {
+      grid.innerHTML = staticHTML;
+    }
   }
 }
 

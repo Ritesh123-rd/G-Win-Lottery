@@ -36,7 +36,8 @@
 html,
 body {
   width: 100%;
-  height: 100%;
+  height: 100vh;
+  height: 100dvh;
   font-family: 'Arial', 'Outfit', sans-serif;
   /* Set Arial as primary for parity */
   color: #fff;
@@ -63,6 +64,7 @@ body {
   background-position: center;
   background-repeat: no-repeat;
   min-height: 100vh;
+  min-height: 100dvh;
 }
 
 body::before {
@@ -80,6 +82,7 @@ body::before {
   z-index: 1;
   width: 100%;
   height: 100vh;
+  height: 100dvh;
   /* Fixed height ensures footer stays on screen */
   margin: 0;
   display: flex;
@@ -141,7 +144,7 @@ body::before {
 }
 
 .header-logo img {
-  height: 200px;
+  height: 242px;
   object-fit: contain;
   margin-top: -40px;
   filter: drop-shadow(0 4px 15px rgba(0, 0, 0, 0.6));
@@ -741,7 +744,7 @@ body::before {
   line-height: 1;
   box-sizing: border-box;
   text-align: center;
-  transform: scaleY(1.6);
+  transform: scaleY(1.6) translateY(-3%);
   transform-origin: center;
 }
 
@@ -818,7 +821,7 @@ body::before {
   color: #ff0f0f;
   font-weight: 900;
   font-family: 'Arial Narrow', sans-serif;
-  font-size: 14px;
+  font-size: 18px;
   /* Balanced for 6 items visibility */
   text-align: center;
   flex-shrink: 0;
@@ -830,9 +833,40 @@ body::before {
 
 .history-item {
   background: #ffe605;
-  padding: 12px 2px;
-  line-height: 1.1;
-  /* min-width removed to ensure all 6 fit in parent width */
+  padding: 4px 2px;
+  line-height: 1;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  row-gap: 10px;
+}
+
+.h-time {
+  display: block;
+  font-size: 13px;
+  font-weight: 900;
+  color: #ff0f0f;
+  line-height: 1;
+  margin: 0;
+}
+
+.h-num {
+  display: block;
+  font-size: 18px;
+  font-weight: 900;
+  color: #ff0f0f;
+  line-height: 1;
+  margin: 0;
+}
+
+.h-small {
+  display: block;
+  font-size: 14px;
+  font-weight: 900;
+  color: #ff0f0f;
+  line-height: 1;
+  margin: 0;
 }
 
 .history-item:last-child {
@@ -854,13 +888,13 @@ body::before {
   border: 1px solid rgba(255, 255, 255, 0.2);
   flex-shrink: 0;
   flex-wrap: nowrap;
-  justify-content: center;
+  justify-content: space-evenly;
   border-radius: 0;
   width: calc(100% + 16px);
   margin-left: -8px;
   margin-right: -8px;
   max-width: none;
-  overflow-x: auto;
+  overflow-x: hidden;
   -webkit-overflow-scrolling: touch;
 }
 
@@ -869,16 +903,16 @@ body::before {
 }
 
 .chip {
-  width: clamp(26px, 3.5vw, 36px);
-  height: clamp(26px, 3.5vw, 36px);
+  width: clamp(36px, 4.2vw, 44px);
+  height: clamp(36px, 4.2vw, 44px);
   aspect-ratio: 1;
-  min-width: 24px;
+  min-width: 34px;
   flex-shrink: 0;
   border-radius: 50%;
   display: flex;
   align-items: center;
   justify-content: center;
-  font-size: clamp(9px, 1.1vw, 13px);
+  font-size: clamp(11px, 1.3vw, 15px);
   font-weight: 900;
   color: #333;
   cursor: pointer;
@@ -942,7 +976,9 @@ body::before {
 }
 
 .barcode-input {
-  width: 100%;
+  width: calc(100% + 16px);
+  margin-left: -8px;
+  margin-right: -8px;
   padding: 14px 8px;
   /* Increased height/padding for better presence */
   font-size: 18px;
@@ -950,7 +986,7 @@ body::before {
   text-align: center;
   background: rgba(255, 255, 255, 0.93);
   border: none;
-  border-radius: 4px;
+  border-radius: 0;
   color: #333;
   font-weight: 500;
   /* Slightly bolder for clarity */
@@ -1394,6 +1430,14 @@ body::before {
     margin-top: -20px;
   }
 
+/* ── Exactly 1024x768 Resolution ─────────────────────────────── */
+@media (max-width: 1024px) {
+  .header-logo img {
+    height: 160px;
+    margin-top: -30px;
+  }
+}
+
   .main-layout {
     grid-template-columns: repeat(3, 1fr) 28px 64px;
     margin-top: -35px;
@@ -1564,6 +1608,66 @@ body::before {
   }
 }
 
+/* ── Short Viewport Fix (non-fullscreen browser) ─────────────── */
+/* Scales center panel content when browser chrome (tabs/address bar) reduces height */
+@media (max-height: 750px) {
+  .center-panel {
+    gap: clamp(2px, 0.8vh, 10px);
+  }
+
+  .tran-boxes {
+    margin-top: 8px;
+  }
+
+  .digit-box {
+    height: 115px;
+    border-width: 10px;
+  }
+
+  .metro-title-row {
+    margin-bottom: -12px;
+  }
+
+  .ornament img {
+    height: clamp(40px, 9vh, 70px);
+  }
+
+  .metro-title img {
+    height: clamp(35px, 8vh, 60px);
+  }
+
+  .info-value {
+    font-size: 22px;
+    padding: 1px 4px;
+  }
+
+  .info-label {
+    font-size: 14px;
+  }
+
+  .display-wrapper {
+    gap: 2px;
+    margin-bottom: 0;
+  }
+
+  .history-item {
+    padding: 5px 2px;
+  }
+
+  .history-grid {
+    margin-bottom: -6px;
+  }
+
+  .timer-box {
+    height: 32px;
+    font-size: 15px;
+  }
+
+  .result-small {
+    font-size: 24px;
+  }
+}
+
 /* ── Laptop / Tablet Landscape (max 1100px) ─────────────────── */
 /* Media queries for 1100px removed to ensure full desktop UI on 1024px screens */
 
@@ -1583,6 +1687,7 @@ body::before {
 
   .app-wrapper {
     min-height: 100vh;
+    min-height: 100dvh;
     overflow-y: auto;
     overflow-x: hidden;
   }
